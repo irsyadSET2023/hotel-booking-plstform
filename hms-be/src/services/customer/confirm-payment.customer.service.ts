@@ -32,69 +32,84 @@ export const confirmPaymentService = async ({
 }: {
   paymentUuid: string;
 }) => {
-  const payment = await prisma.payment.findUnique({
-    where: { uuid: paymentUuid },
-    include: {
-      order: {
-        include: {
-          cart: {
-            include: {
-              cartItems: {
-                include: {
-                  roomCategory: {
-                    include: {
-                      hotel: {
-                        select: { name: true },
-                      },
-                    },
-                  },
-                },
-              },
-              customer: true,
+  const result = await prisma.$transaction(async (tx) => {
+    // 1. LOCK PAYMENT
+    const paymentRows = await tx.$queryRaw<any[]>`
+      SELECT *
+      FROM payment
+      WHERE uuid = ${paymentUuid}
+      FOR UPDATE
+    `;
+
+    const payment = paymentRows[0];
+
+    if (!payment) throw new AppError("Payment not found");
+
+    // 2. IDEMPOTENCY CHECK (SAFE HERE)
+    if (payment.status === PaymentStatus.PAID) {
+      return null;
+    }
+
+    // 3. LOCK ORDER + CART + ITEMS
+    const orderRows = await tx.$queryRaw<Order[]>`
+      SELECT *
+      FROM "Order"
+      WHERE id = ${payment.orderId}
+      FOR UPDATE
+    `;
+
+    const order = orderRows[0];
+
+    if (!order) throw new AppError("Order not found");
+
+    const cartItems = await tx.cartItem.findMany({
+      where: {
+        cartId: order.cartId,
+      },
+      include: {
+        roomCategory: {
+          include: {
+            hotel: {
+              select: { name: true },
             },
           },
         },
       },
-    },
-  });
+    });
 
-  if (!payment) throw new AppError("Payment not found");
+    const cart = await tx.cart.findUnique({
+      where: { id: order.cartId },
+      include: { customer: true },
+    });
 
-  if (payment.status === PaymentStatus.PAID) {
-    return; // Idempotency protection: if already marked as PAID, do nothing
-  }
+    const customer = cart?.customer;
 
-  const result = await prisma.$transaction(async (tx) => {
+    if (!customer) throw new AppError("Customer not found");
+
+    // 4. UPDATE STATE
     await tx.payment.update({
-      where: { uuid: paymentUuid },
-      data: {
-        status: PaymentStatus.PAID,
-      },
+      where: { id: payment.id },
+      data: { status: PaymentStatus.PAID },
     });
 
     await tx.order.update({
-      where: { uuid: payment.order.uuid },
-      data: {
-        status: OrderStatus.PAID,
-      },
+      where: { id: order.id },
+      data: { status: OrderStatus.PAID },
     });
 
     const emailBookingData = await createBooking(
       tx,
-      payment.order.cart.cartItems,
-      payment.order.cart.customer,
-      payment.order,
+      cartItems,
+      customer,
+      order,
     );
+    return emailBookingData;
 
-    return { emailBookingData };
+    // 5. CREATE BOOKINGS
   });
 
-  const emailBookingData = result?.emailBookingData;
-
-  if (emailBookingData) {
-    (async () => {
-      await sendBookingConfirmationEmail(emailBookingData);
-    })();
+  if (result) {
+    await sendBookingConfirmationEmail(result);
   }
 };
 
