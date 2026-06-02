@@ -1,0 +1,747 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  SUPER_ADMIN
+  HOTEL_ADMIN
+}
+
+enum RoomStatus {
+  AVAILABLE
+  OCCUPIED
+  MAINTENANCE
+  OUT_OF_SERVICE
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CHECKED_IN
+  CHECKED_OUT
+  CANCELLED
+  NO_SHOW
+}
+
+enum BookingSource {
+  WEBSITE
+  THIRD_PARTY
+  RECEPTION
+  PHONE
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  PARTIAL
+  REFUNDED
+  FAILED
+  EXPIRED
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  CANCELLED
+  EXPIRED
+}
+
+enum PaymentMethod {
+  CASH
+  CREDIT_CARD
+  DEBIT_CARD
+  BANK_TRANSFER
+  ONLINE_GATEWAY
+  OTA_PREPAID
+}
+
+enum PaymentGateway {
+  STRIPE
+  PAYPAL
+  SQUARE
+  AUTHORIZE_NET
+  ADYEN
+  BRAINTREE
+  WORLD_PAY
+}
+
+enum RoomEventType {
+  CHECK_IN
+  CHECK_OUT
+  DAMAGE_REPORTED
+  DAMAGE_RESOLVED
+  MAINTENANCE_START
+  MAINTENANCE_END
+  INSPECTION
+  HOUSEKEEPING
+  NOTE
+}
+
+enum LoyaltyPointType {
+  EARNED
+  REDEEMED
+  EXPIRED
+  BONUS
+  ADJUSTMENT
+}
+
+enum IdType {
+  PASSPORT
+  NATIONAL_ID
+  DRIVERS_LICENSE
+  OTHER
+}
+
+enum CartStatus {
+  ACTIVE
+  CHECKED_OUT
+  ABANDONED
+  EXPIRED
+}
+
+// ─── Countries ───────────────────────────────────────────────────────────────
+
+model Country {
+  id        BigInt   @id @default(autoincrement()) @map("id")
+  uuid      String   @unique @default(uuid()) @map("uuid")
+  name      String   @unique @map("name")
+  iso2      String   @unique @map("iso2") // e.g. "ID", "US"
+  iso3      String   @unique @map("iso3") // e.g. "IDN", "USA"
+  phoneCode String   @map("phone_code") // e.g. "+62", "+1"
+  currency  String?  @map("currency") // e.g. "IDR", "USD"
+  flag      String?  @map("flag") // emoji or URL
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  cities                     City[]
+  addresses                  Address[]        @relation("AddressCountry")
+  addressPhoneNumbers        Address[]        @relation("AddressPhoneCountry")
+  billingAddresses           BillingAddress[] @relation("BillingAddressCountry")
+  billingAddressPhoneNumbers BillingAddress[] @relation("BillingAddressPhoneCountry")
+  timezones                  Timezone[]
+  customersPhoneCodes        Customer[]       @relation("CustomerPhoneCountry")
+
+  @@index([uuid])
+  @@map("countries")
+}
+
+model Timezone {
+  id        BigInt   @id @default(autoincrement()) @map("id")
+  uuid      String   @unique @default(uuid()) @map("uuid")
+  countryId BigInt   @map("country_id")
+  name      String   @unique @map("name") // e.g. "America/New_York"
+  offset    String   @map("offset") // e.g. "-05:00"
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  country   Country   @relation(fields: [countryId], references: [id])
+  addresses Address[]
+
+  @@index([uuid])
+  @@map("timezones")
+}
+
+// ─── Cities ───────────────────────────────────────────────────────────────────
+
+model City {
+  id            BigInt   @id @default(autoincrement()) @map("id")
+  uuid          String   @unique @default(uuid()) @map("uuid")
+  countryId     BigInt   @map("country_id")
+  name          String   @map("name")
+  stateProvince String?  @map("state_province") // state / province / region
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  country          Country          @relation(fields: [countryId], references: [id])
+  addresses        Address[]
+  billingAddresses BillingAddress[]
+
+  @@index([uuid])
+  @@index([countryId])
+  @@map("cities")
+}
+
+// ─── Addresses ────────────────────────────────────────────────────────────────
+
+model Address {
+  id             BigInt    @id @default(autoincrement()) @map("id")
+  uuid           String    @unique @default(uuid()) @map("uuid")
+  // Parent references — only one will be non-null at a time
+  hotelId        BigInt?   @map("hotel_id")
+  customerId     BigInt?   @map("customer_id")
+  label          String?   @map("label") // e.g. "home", "work", "primary"
+  isPrimary      Boolean   @default(false) @map("is_primary")
+  addressLine1   String    @map("address_line_1")
+  addressLine2   String?   @map("address_line_2")
+  cityId         BigInt    @map("city_id")
+  countryId      BigInt    @map("country_id")
+  stateProvince  String?   @map("state_province")
+  postalCode     String?   @map("postal_code")
+  phoneCountryId BigInt?   @map("phone_country_id") // FK to Country for the dial code
+  timezoneId     BigInt?   @map("timezone_id") // optional override for hotel timezone
+  phoneNumber    String?   @map("phone_number")
+  latitude       Decimal?  @map("latitude") @db.Decimal(10, 8)
+  longitude      Decimal?  @map("longitude") @db.Decimal(11, 8)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  city         City      @relation(fields: [cityId], references: [id])
+  country      Country   @relation("AddressCountry", fields: [countryId], references: [id])
+  phoneCountry Country?  @relation("AddressPhoneCountry", fields: [phoneCountryId], references: [id])
+  hotel        Hotel?    @relation(fields: [hotelId], references: [id])
+  customer     Customer? @relation(fields: [customerId], references: [id])
+  timezone     Timezone? @relation(fields: [timezoneId], references: [id])
+
+  @@index([uuid])
+  @@index([hotelId])
+  @@index([customerId])
+  @@index([cityId])
+  @@index([countryId])
+  @@map("addresses")
+}
+
+// ─── Billing Addresses ────────────────────────────────────────────────────────
+
+model BillingAddress {
+  id             BigInt    @id @default(autoincrement()) @map("id")
+  uuid           String    @unique @default(uuid()) @map("uuid")
+  // Parent references — only one will be non-null at a time
+  customerId     BigInt?   @map("customer_id")
+  bookingId      BigInt?   @map("booking_id")
+  isPrimary      Boolean   @default(false) @map("is_primary")
+  firstName      String    @map("first_name")
+  lastName       String    @map("last_name")
+  companyName    String?   @map("company_name")
+  taxId          String?   @map("tax_id") // VAT / company tax number for invoicing
+  addressLine1   String    @map("address_line_1")
+  addressLine2   String?   @map("address_line_2")
+  cityId         BigInt    @map("city_id")
+  countryId      BigInt    @map("country_id")
+  stateProvince  String?   @map("state_province")
+  postalCode     String?   @map("postal_code")
+  email          String?   @map("email")
+  phoneCountryId BigInt?   @map("phone_country_id") // FK to Country for the dial code
+  phoneNumber    String?   @map("phone_number")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  city         City      @relation(fields: [cityId], references: [id])
+  country      Country   @relation("BillingAddressCountry", fields: [countryId], references: [id])
+  phoneCountry Country?  @relation("BillingAddressPhoneCountry", fields: [phoneCountryId], references: [id])
+  customer     Customer? @relation(fields: [customerId], references: [id])
+  orders       Order[]
+
+  @@index([uuid])
+  @@index([customerId])
+  @@index([bookingId])
+  @@index([cityId])
+  @@index([countryId])
+  @@map("billing_addresses")
+}
+
+// ─── Hotels ──────────────────────────────────────────────────────────────────
+
+model Hotel {
+  id   BigInt @id @default(autoincrement()) @map("id")
+  uuid String @unique @default(uuid()) @map("uuid")
+
+  name       String    @map("name")
+  starRating Int?      @map("star_rating")
+  isActive   Boolean   @default(true) @map("is_active")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  deletedAt  DateTime? @map("deleted_at")
+
+  addresses       Address[]
+  users           User[]
+  roomCategories  RoomCategory[]
+  rooms           Room[]
+  bookings        Booking[]
+  perks           Perk[]
+  images          Image[]
+  roomInventories RoomInventory[]
+
+  @@index([uuid])
+  @@map("hotels")
+}
+
+// ─── Users (Staff) ───────────────────────────────────────────────────────────
+
+model User {
+  id          BigInt    @id @default(autoincrement()) @map("id") // internal, never expose externally
+  uuid        String    @unique @default(uuid()) @map("uuid") // safe external reference
+  hotelId     BigInt?   @map("hotel_id") // null = SUPER_ADMIN (chain-wide)
+  email       String    @unique @map("email")
+  password    String    @map("password")
+  firstName   String    @map("first_name")
+  lastName    String    @map("last_name")
+  role        UserRole  @map("role")
+  isActive    Boolean   @default(true) @map("is_active")
+  lastLoginAt DateTime? @map("last_login_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  hotel             Hotel?      @relation(fields: [hotelId], references: [id])
+  bookingsCreated   Booking[]   @relation("BookingCreatedBy")
+  bookingsCancelled Booking[]   @relation("BookingCancelledBy")
+  roomEvents        RoomEvent[]
+  auditLogs         AuditLog[]
+
+  @@index([uuid])
+  @@map("users")
+}
+
+// ─── Customers ───────────────────────────────────────────────────────────────
+
+model Customer {
+  id                 BigInt    @id @default(autoincrement()) @map("id") // internal, never expose externally
+  uuid               String    @unique @default(uuid()) @map("uuid") // safe external reference
+  email              String    @unique @map("email")
+  phoneCountryCodeId BigInt?   @map("phone_country_code_id") // e.g. "+1", "+62"
+  phoneNumber        String?   @map("phone_number") // local number without country code
+  password           String?   @map("password") // null = guest (no account)
+  firstName          String?   @map("first_name")
+  lastName           String?   @map("last_name")
+  dateOfBirth        DateTime? @map("date_of_birth")
+  nationality        String?   @map("nationality")
+  idType             IdType?   @map("id_type")
+  idNumber           String?   @map("id_number") // passport / national ID number
+  emailVerified      Boolean   @default(false) @map("email_verified")
+  isActive           Boolean   @default(true) @map("is_active")
+  loyaltyTierId      BigInt?   @map("loyalty_tier_id")
+  loyaltyPoints      Int       @default(0) @map("loyalty_points")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  deletedAt          DateTime? @map("deleted_at")
+
+  loyaltyTier         LoyaltyTier?              @relation(fields: [loyaltyTierId], references: [id])
+  addresses           Address[]
+  billingAddresses    BillingAddress[]
+  carts               Cart[]
+  bookings            Booking[]
+  loyaltyTransactions LoyaltyPointTransaction[]
+  auditLogs           AuditLog[]
+  otps                Otp[]
+  phoneCountryCode    Country?                  @relation(name: "CustomerPhoneCountry", fields: [phoneCountryCodeId], references: [id])
+
+  @@index([uuid])
+  @@map("customers")
+}
+
+model Otp {
+  id         BigInt   @id @default(autoincrement()) @map("id")
+  uuid       String   @unique @default(uuid()) @map("uuid")
+  customerId BigInt?  @map("customer_id")
+  type       String   @map("type") // e.g. "EMAIL_VERIFICATION", "PASSWORD_RESET"
+  code       String   @map("code") // e.g. "123456"
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  customer Customer? @relation(fields: [customerId], references: [id])
+
+  @@index([uuid])
+  @@index([customerId])
+  @@map("otps")
+}
+
+// ─── Room Categories ─────────────────────────────────────────────────────────
+
+model RoomCategory {
+  id           BigInt    @id @default(autoincrement()) @map("id")
+  uuid         String    @unique @default(uuid()) @map("uuid")
+  hotelId      BigInt    @map("hotel_id")
+  name         String    @map("name") // e.g. Single, Double, Deluxe Double, Suite
+  description  String?   @map("description")
+  maxOccupancy Int       @map("max_occupancy")
+  bedType      String?   @map("bed_type") // e.g. King, Twin, Double
+  sizeM2       Float?    @map("size_m2")
+  basePrice    Decimal   @map("base_price") @db.Decimal(10, 2)
+  amenities    Json?     @map("amenities") // string[]
+  sortOrder    Int       @default(0) @map("sort_order")
+  isActive     Boolean   @default(true) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+
+  hotel           Hotel           @relation(fields: [hotelId], references: [id])
+  rooms           Room[]
+  bookings        Booking[]
+  roomInventories RoomInventory[]
+  cartItems       CartItem[]
+
+  @@index([uuid])
+  @@map("room_categories")
+}
+
+// ─── Rooms ───────────────────────────────────────────────────────────────────
+
+model Room {
+  id             BigInt     @id @default(autoincrement()) @map("id")
+  uuid           String     @unique @default(uuid()) @map("uuid")
+  hotelId        BigInt     @map("hotel_id")
+  roomCategoryId BigInt     @map("room_category_id")
+  roomNumber     String     @map("room_number") // e.g. "247", "101A"
+  floor          Int?       @map("floor")
+  status         RoomStatus @default(AVAILABLE) @map("status")
+  notes          String?    @map("notes")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+  deletedAt      DateTime?  @map("deleted_at")
+
+  hotel        Hotel        @relation(fields: [hotelId], references: [id])
+  roomCategory RoomCategory @relation(fields: [roomCategoryId], references: [id])
+  bookings     Booking[]
+  roomEvents   RoomEvent[]
+  roomPerks    RoomPerk[]
+  images       Image[]
+
+  @@unique([hotelId, roomNumber])
+  @@index([uuid])
+  @@map("rooms")
+}
+
+model RoomPerk {
+  roomId    BigInt   @map("room_id")
+  perkId    String   @map("perk_id") // FK to Perk.key
+  createdAt DateTime @default(now()) @map("created_at")
+
+  room Room @relation(fields: [roomId], references: [id])
+  perk Perk @relation(fields: [perkId], references: [key])
+
+  @@id([roomId, perkId])
+  @@index([roomId])
+  @@index([perkId])
+  @@map("room_perks")
+}
+
+model Perk {
+  id        String    @id @default(uuid())
+  hotelId   BigInt    @map("hotel_id")
+  key       String    @unique
+  icon      String
+  isActive  Boolean   @default(true) @map("is_active")
+  values    String[]
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  roomPerks RoomPerk[]
+  hotel     Hotel      @relation(fields: [hotelId], references: [id])
+
+  @@unique([hotelId, key])
+  @@map("perks")
+}
+
+// ─── Carts ───────────────────────────────────────────────────────────────────
+
+model Cart {
+  id           BigInt    @id @default(autoincrement()) @map("id")
+  uuid         String    @unique @default(uuid()) @map("uuid")
+  customerId   BigInt?   @map("customer_id")
+  isCheckedOut Boolean   @default(false) @map("is_checked_out")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+
+  customer  Customer?  @relation(fields: [customerId], references: [id])
+  cartItems CartItem[]
+  order     Order?
+
+  @@index([uuid])
+  @@index([customerId])
+  @@map("carts")
+}
+
+model CartItem {
+  id              BigInt   @id @default(autoincrement()) @map("id")
+  uuid            String   @unique @default(uuid()) @map("uuid")
+  cartId          BigInt   @map("cart_id")
+  roomCategoryId  BigInt   @map("room_category_id") // set when a specific room category
+  checkInDate     DateTime @map("check_in_date")
+  checkOutDate    DateTime @map("check_out_date")
+  specialRequests String?  @map("special_requests")
+  guestName       String?  @map("guest_name") // optional override for guest name on booking
+  guestEmail      String?  @map("guest_email") // optional override for guest email on booking
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  cart         Cart         @relation(fields: [cartId], references: [id])
+  roomCategory RoomCategory @relation(fields: [roomCategoryId], references: [id])
+
+  @@index([uuid])
+  @@index([cartId])
+  @@map("cart_items")
+}
+
+model Order {
+  id               BigInt      @id @default(autoincrement()) @map("id")
+  uuid             String      @unique @default(uuid()) @map("uuid")
+  cartId           BigInt      @unique @map("cart_id")
+  billingAddressId BigInt?     @map("billing_address_id") // FK to BillingAddress for invoicing
+  subtotalAmount   BigInt      @map("subtotal_amount") // stored in smallest currency unit (e.g. cents) to avoid floating-point issues
+  taxAmount        BigInt      @map("tax_amount") // stored in smallest currency unit (e.g. cents) to avoid floating-point issues
+  discountAmount   BigInt      @map("discount_amount") // stored in smallest currency unit (e.g. cents) to avoid floating-point issues
+  totalAmount      BigInt      @map("total_amount") // stored in smallest currency unit (e.g. cents) to avoid floating-point issues
+  status           OrderStatus @map("status") // e.g. "PENDING", "PAID", "CANCELLED"
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
+  deletedAt        DateTime?   @map("deleted_at")
+
+  booking        Booking[]
+  cart           Cart            @relation(fields: [cartId], references: [id])
+  billingAddress BillingAddress? @relation(fields: [billingAddressId], references: [id])
+
+  @@index([uuid])
+  @@map("orders")
+}
+
+// ─── Bookings ────────────────────────────────────────────────────────────────
+
+model Booking {
+  id                 BigInt  @id @default(autoincrement()) @map("id")
+  uuid               String  @unique @default(uuid()) @map("uuid")
+  confirmationNumber String  @unique @default(cuid()) @map("confirmation_number")
+  orderId            BigInt  @unique @map("order_id")
+  hotelId            BigInt  @map("hotel_id")
+  roomCategoryId     BigInt  @map("room_category_id")
+  roomId             BigInt? @map("room_id")
+  customerId         BigInt? @map("customer_id")
+
+  checkInDate      DateTime  @map("check_in_date")
+  checkOutDate     DateTime  @map("check_out_date")
+  actualCheckInAt  DateTime? @map("actual_check_in_at")
+  actualCheckOutAt DateTime? @map("actual_check_out_at")
+  guestName        String    @map("guest_name")
+  guestEmail       String    @map("guest_email")
+
+  status        BookingStatus @default(PENDING) @map("status")
+  source        BookingSource @default(WEBSITE) @map("source")
+  externalRefId String?       @map("external_ref_id") // OTA / third-party booking reference
+
+  baseAmount     Decimal @map("base_amount") @db.Decimal(10, 2)
+  discountAmount Decimal @default(0) @map("discount_amount") @db.Decimal(10, 2)
+  taxAmount      Decimal @default(0) @map("tax_amount") @db.Decimal(10, 2)
+  totalAmount    Decimal @map("total_amount") @db.Decimal(10, 2)
+
+  specialRequests    String?   @map("special_requests")
+  cancellationReason String?   @map("cancellation_reason")
+  cancelledAt        DateTime? @map("cancelled_at")
+
+  createdByUserId   BigInt? @map("created_by_user_id") // staff actor; null = self-service / third-party
+  cancelledByUserId BigInt? @map("cancelled_by_user_id")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  hotel               Hotel                     @relation(fields: [hotelId], references: [id])
+  roomCategory        RoomCategory              @relation(fields: [roomCategoryId], references: [id])
+  room                Room?                     @relation(fields: [roomId], references: [id])
+  order               Order                     @relation(fields: [orderId], references: [id])
+  customer            Customer?                 @relation(fields: [customerId], references: [id])
+  createdByUser       User?                     @relation("BookingCreatedBy", fields: [createdByUserId], references: [id])
+  cancelledByUser     User?                     @relation("BookingCancelledBy", fields: [cancelledByUserId], references: [id])
+  roomEvents          RoomEvent[]
+  loyaltyTransactions LoyaltyPointTransaction[]
+  auditLogs           AuditLog[]
+
+  @@index([uuid])
+  @@index([hotelId, checkInDate, checkOutDate])
+  @@index([roomId, checkInDate, checkOutDate])
+  @@index([customerId])
+  @@map("bookings")
+}
+
+// ─── Payments ────────────────────────────────────────────────────────────────
+
+model Payment {
+  id             BigInt          @id @default(autoincrement()) @map("id")
+  uuid           String          @unique @default(uuid()) @map("uuid")
+  amount         BigInt          @map("amount") // stored in smallest currency unit (e.g. cents) to avoid floating-point issues
+  currency       String          @default("USD") @map("currency")
+  paymentMethod  PaymentMethod?  @map("payment_method")
+  paymentGateway PaymentGateway? @map("payment_gateway") // e.g. STRIPE, PAYPAL
+  status         PaymentStatus   @default(PENDING) @map("status")
+  transactionId  String?         @map("transaction_id") // external payment gateway reference
+  paidAt         DateTime?       @map("paid_at")
+  notes          String?         @map("notes")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+
+  paymentGatewayLogs PaymentGatewayLog[]
+
+  @@index([uuid])
+  @@map("payments")
+}
+
+model PaymentGatewayLog {
+  id           BigInt   @id @default(autoincrement()) @map("id")
+  paymentId    BigInt   @map("payment_id")
+  event        String   @map("event") // e.g. "REQUEST", "RESPONSE", "ERROR"
+  request      Json     @map("request")
+  response     Json     @map("response")
+  errorMessage String?  @map("error_message")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  payment Payment @relation(fields: [paymentId], references: [id])
+
+  @@index([paymentId])
+  @@map("payment_gateway_logs")
+}
+
+// ─── Room Events (History Log) ────────────────────────────────────────────────
+
+model RoomEvent {
+  id               BigInt        @id @default(autoincrement()) @map("id")
+  uuid             String        @unique @default(uuid()) @map("uuid")
+  roomId           BigInt        @map("room_id")
+  bookingId        BigInt?       @map("booking_id")
+  eventType        RoomEventType @map("event_type")
+  description      String?       @map("description")
+  damageSeverity   String?       @map("damage_severity") // low | medium | high
+  repairCost       Decimal?      @map("repair_cost") @db.Decimal(10, 2)
+  reportedByUserId BigInt?       @map("reported_by_user_id")
+  occurredAt       DateTime      @default(now()) @map("occurred_at")
+  createdAt        DateTime      @default(now()) @map("created_at")
+
+  room           Room     @relation(fields: [roomId], references: [id])
+  booking        Booking? @relation(fields: [bookingId], references: [id])
+  reportedByUser User?    @relation(fields: [reportedByUserId], references: [id])
+
+  @@index([uuid])
+  @@index([roomId])
+  @@index([bookingId])
+  @@map("room_events")
+}
+
+model RoomInventory {
+  id             BigInt @id @default(autoincrement()) @map("id")
+  hotelId        BigInt @map("hotel_id")
+  roomCategoryId BigInt @map("room_category_id")
+
+  inventoryDate DateTime @map("inventory_date")
+
+  totalRooms    Int @map("total_rooms")
+  reservedRooms Int @map("reserved_rooms")
+  blockedRooms  Int @map("blocked_rooms")
+
+  availableRooms Int @map("available_rooms")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  hotel        Hotel        @relation(fields: [hotelId], references: [id])
+  roomCategory RoomCategory @relation(fields: [roomCategoryId], references: [id])
+
+  @@unique([hotelId, roomCategoryId, inventoryDate])
+  @@map("room_inventories")
+}
+
+// ─── Loyalty Program ─────────────────────────────────────────────────────────
+
+model LoyaltyTier {
+  id         BigInt    @id @default(autoincrement()) @map("id")
+  uuid       String    @unique @default(uuid()) @map("uuid")
+  name       String    @unique @map("name") // Bronze, Silver, Gold, Platinum
+  minPoints  Int       @map("min_points")
+  multiplier Float     @default(1.0) @map("multiplier") // points-earning multiplier
+  benefits   Json?     @map("benefits") // string[]
+  colorHex   String?   @map("color_hex")
+  sortOrder  Int       @default(0) @map("sort_order")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  deletedAt  DateTime? @map("deleted_at")
+
+  customers Customer[]
+
+  @@index([uuid])
+  @@map("loyalty_tiers")
+}
+
+model LoyaltyPointTransaction {
+  id            BigInt           @id @default(autoincrement()) @map("id")
+  uuid          String           @unique @default(uuid()) @map("uuid")
+  customerId    BigInt           @map("customer_id")
+  bookingId     BigInt?          @map("booking_id")
+  type          LoyaltyPointType @map("type")
+  points        Int              @map("points") // positive = earned/bonus, negative = redeemed/expired
+  balanceBefore Int              @map("balance_before")
+  balanceAfter  Int              @map("balance_after")
+  description   String?          @map("description")
+  expiresAt     DateTime?        @map("expires_at")
+  createdAt     DateTime         @default(now()) @map("created_at")
+
+  customer Customer @relation(fields: [customerId], references: [id])
+  booking  Booking? @relation(fields: [bookingId], references: [id])
+
+  @@index([uuid])
+  @@index([customerId])
+  @@map("loyalty_point_transactions")
+}
+
+// ─── Audit Logs ──────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id         BigInt   @id @default(autoincrement()) @map("id")
+  uuid       String   @unique @default(uuid()) @map("uuid")
+  userId     BigInt?  @map("user_id") // staff actor
+  customerId BigInt?  @map("customer_id") // customer actor
+  bookingId  BigInt?  @map("booking_id")
+  action     String   @map("action") // CREATE | UPDATE | DELETE | LOGIN | CANCEL | CHECK_IN | etc.
+  entity     String   @map("entity") // model name, e.g. "Booking", "Room"
+  entityId   BigInt   @map("entity_id")
+  oldValues  Json?    @map("old_values")
+  newValues  Json?    @map("new_values")
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user     User?     @relation(fields: [userId], references: [id])
+  customer Customer? @relation(fields: [customerId], references: [id])
+  booking  Booking?  @relation(fields: [bookingId], references: [id])
+
+  @@index([uuid])
+  @@index([entity, entityId])
+  @@index([userId])
+  @@index([customerId])
+  @@map("audit_logs")
+}
+
+model Image {
+  id         BigInt   @id @default(autoincrement()) @map("id")
+  uuid       String   @unique @default(uuid()) @map("uuid")
+  customerId BigInt?  @map("customer_id")
+  hotelId    BigInt?  @map("hotel_id")
+  roomId     BigInt?  @map("room_id")
+  path       String   @map("path")
+  isPrimary  Boolean  @default(false) @map("is_primary")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  hotel Hotel? @relation(fields: [hotelId], references: [id])
+  room  Room?  @relation(fields: [roomId], references: [id])
+
+  @@index([uuid])
+  @@index([hotelId])
+  @@index([roomId])
+  @@map("images")
+}
