@@ -1,6 +1,6 @@
 import { Input } from '@/components/ui/input'
 import { Search, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 interface SearchInputProps {
   value?: string
@@ -18,6 +18,11 @@ export function SearchInput({
   onSearch,
 }: SearchInputProps) {
   const [inputValue, setInputValue] = useState(value)
+  const onSearchRef = useRef(onSearch)
+
+  useEffect(() => {
+    onSearchRef.current = onSearch
+  })
 
   useEffect(() => {
     setInputValue(value)
@@ -25,11 +30,11 @@ export function SearchInput({
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      onSearch(inputValue)
+      onSearchRef.current(inputValue)
     }, debounceMs)
 
     return () => clearTimeout(timer)
-  }, [inputValue, debounceMs, onSearch])
+  }, [inputValue, debounceMs])
 
   const resetSearch = () => {
     setInputValue('')

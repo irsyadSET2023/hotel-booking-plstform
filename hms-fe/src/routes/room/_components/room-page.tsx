@@ -96,7 +96,7 @@ export function RoomPage() {
           <label className="text-sm font-medium">Room category</label>
 
           <Select
-            value={search.roomCategory ?? ''}
+            value={search?.roomCategory ?? undefined}
             onValueChange={(value) =>
               navigate({
                 search: (prev) => ({
@@ -112,7 +112,6 @@ export function RoomPage() {
             </SelectTrigger>
 
             <SelectContent>
-              <SelectItem value="all">All</SelectItem>
               <SelectItem value={'Standard'}>Standard</SelectItem>
               <SelectItem value={'Deluxe'}>Deluxe</SelectItem>
               <SelectItem value={'Suite'}>Suite</SelectItem>
