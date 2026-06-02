@@ -28,9 +28,9 @@ export const listRooms = async (c: Context<AppEnv>) => {
 export const listRoomCategories = async (c: Context) => {
   try {
     const query = (c.req as any).valid("query");
-    const user = c.get("user"); // optional auth (may be undefined)
+    // const user = c.get("user"); // optional auth (may be undefined)
 
-    const result = await listRoomCategoriesService(query, user);
+    const result = await listRoomCategoriesService(query, undefined);
 
     return sendSuccess(c, result);
   } catch (error) {

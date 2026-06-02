@@ -7,13 +7,23 @@ type Query = {
   hotelUuid?: string;
   checkInDate: string;
   checkOutDate: string;
+  search?: string;
+  roomCategory?: string;
 };
 
 export const listRoomCategoriesService = async (
   query: Query,
   user?: RequestingUser,
 ) => {
-  const { page, limit, hotelUuid, checkInDate, checkOutDate } = query;
+  const {
+    page,
+    limit,
+    hotelUuid,
+    checkInDate,
+    checkOutDate,
+    search,
+    roomCategory,
+  } = query;
 
   const skip = (page - 1) * limit;
 
@@ -27,6 +37,14 @@ export const listRoomCategoriesService = async (
 
   if (hotelUuid) {
     where.hotel = { uuid: hotelUuid };
+  }
+
+  if (search) {
+    where.hotel = { name: { contains: search, mode: "insensitive" } };
+  }
+
+  if (roomCategory) {
+    where.name = { contains: roomCategory, mode: "insensitive" };
   }
 
   if (user?.role === "HOTEL_ADMIN") {

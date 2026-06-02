@@ -33,6 +33,8 @@ export const listRoomCategoriesQuerySchema = z
     page: z.coerce.number().min(1).default(1),
     limit: z.coerce.number().min(1).max(100).default(20),
 
+    roomCategory: z.string().optional(),
+    search: z.string().optional(),
     hotelUuid: z.string().optional(),
 
     checkInDate: z.coerce.date(),
