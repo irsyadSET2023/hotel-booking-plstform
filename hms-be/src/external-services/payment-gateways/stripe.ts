@@ -4,6 +4,7 @@ import type {
   PaymentStatus,
   StripePaymentRequestDetails,
 } from "../../interfaces";
+import { AppError } from "../../utils/app-error";
 
 const stripe = new Stripe(stripeConfig.secretKey, {
   apiVersion: "2026-05-27.dahlia", // Use the latest API version
@@ -12,53 +13,49 @@ const stripe = new Stripe(stripeConfig.secretKey, {
 export async function createStripePaymentRequest(
   paymentRequestDetails: StripePaymentRequestDetails,
 ) {
-  try {
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
-      line_items: [
-        {
-          price_data: {
-            currency: paymentRequestDetails.currency,
-            product_data: {
-              name: paymentRequestDetails.description,
-            },
-            unit_amount: paymentRequestDetails.amount * 100, // Stripe uses cents
+  const session = await stripe.checkout.sessions.create({
+    payment_method_types: ["card"],
+    line_items: [
+      {
+        price_data: {
+          currency: paymentRequestDetails.currency,
+          product_data: {
+            name: paymentRequestDetails.description,
           },
-          quantity: 1,
+          unit_amount: paymentRequestDetails.amount * 100, // Stripe uses cents
         },
-      ],
-      mode: "payment",
-      success_url: paymentRequestDetails.successUrl,
-      cancel_url: paymentRequestDetails.cancelUrl,
-      customer_email: paymentRequestDetails.email,
-      metadata: {
-        reference_number: paymentRequestDetails.reference_number,
+        quantity: 1,
       },
-    });
+    ],
+    mode: "payment",
+    success_url: paymentRequestDetails.successUrl,
+    cancel_url: paymentRequestDetails.cancelUrl,
+    customer_email: paymentRequestDetails.email,
+    metadata: {
+      reference_number: paymentRequestDetails.reference_number,
+    },
+  });
 
-    return session;
-  } catch (error) {
-    console.error("Error creating Stripe payment request:", error);
-    throw error;
+  if (!session) {
+    throw new AppError("Failed to create Stripe payment session", 500);
   }
+  return session;
 }
 
 export async function getStripePaymentStatus(
   stripeSessionId: string,
 ): Promise<PaymentStatus> {
-  try {
-    const session = await stripe.checkout.sessions.retrieve(stripeSessionId);
+  const session = await stripe.checkout.sessions.retrieve(stripeSessionId);
 
-    return {
-      status: session.payment_status,
-      description: session.metadata?.description || "",
-      amount: (session.amount_total! / 100).toString(), // Convert back from cents
-      reference_number: session.metadata?.reference_number || "",
-    };
-  } catch (error) {
-    console.error("Error getting Stripe payment status:", error);
-    throw error;
+  if (!session) {
+    throw new AppError("Stripe session not found", 400);
   }
+  return {
+    status: session.payment_status,
+    description: session.metadata?.description || "",
+    amount: (session.amount_total! / 100).toString(), // Convert back from cents
+    reference_number: session.metadata?.reference_number || "",
+  };
 }
 
 export async function getStripePaymentStatusThankYouPage(
@@ -105,30 +102,20 @@ export async function getStripePaymentStatusThankYouPage(
   return await getStripePaymentStatus(stripeSessionId);
 }
 
-export async function verifyStripeWebhook(
-  payload: Buffer,
-  signature: string,
-): Promise<boolean> {
-  try {
-    const event = stripe.webhooks.constructEvent(
-      payload,
-      signature,
-      stripeConfig.webhookSecret,
-    );
-    return true;
-  } catch (error) {
-    console.error("Error verifying Stripe webhook:", error);
-    return false;
-  }
+export async function verifyStripeWebhook(payload: Buffer, signature: string) {
+  return await stripe.webhooks.constructEventAsync(
+    payload,
+    signature,
+    stripeConfig.webhookSecret,
+  );
 }
 
-export async function cancelStripePayment(
-  sessionId: string,
-): Promise<boolean | void> {
-  try {
-    const session = await stripe.checkout.sessions.expire(sessionId);
+export async function cancelStripePayment(sessionId: string): Promise<boolean> {
+  const session = await stripe.checkout.sessions.expire(sessionId);
+
+  if (session) {
     return true;
-  } catch (error) {
-    console.error("Error canceling Stripe payment:", error);
+  } else {
+    return false;
   }
 }

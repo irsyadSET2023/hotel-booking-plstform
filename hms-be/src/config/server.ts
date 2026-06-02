@@ -9,6 +9,10 @@ const serverConfig = {
     process.env.JWT_SECRET ||
     "hms-super-secret-jwt-key-change-in-production-2026",
   sstRate: parseFloat(process.env.SST_RATE || "0.08"), // Default to 8% if not set
+  frontendUrl: process.env.FRONTEND_URL || "http://localhost:3000",
+  testDatabaseUrl:
+    process.env.TEST_DATABASE_URL ||
+    "postgresql://postgres:root@localhost/hotel_management_system_test",
 };
 
 export default serverConfig;

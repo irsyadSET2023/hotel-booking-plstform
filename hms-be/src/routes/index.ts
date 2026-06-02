@@ -6,11 +6,13 @@ import hotelRouter from "./hotel";
 import referencesRouter from "./references";
 import roomRouter from "./room";
 import customerRouter from "./customer";
+import webhookRouter from "./webhook";
 
 const appRouter = new Hono<AppEnv>();
 
 // Module routes
 appRouter.route("/", healthRouter);
+appRouter.route("/webhook", webhookRouter);
 appRouter.route("/api/auth", authRouter);
 appRouter.route("/api/hotels", hotelRouter);
 appRouter.route("/api/references", referencesRouter);

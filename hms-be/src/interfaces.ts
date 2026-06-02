@@ -16,6 +16,7 @@ export interface PaymentStatus {
 }
 
 export interface CheckoutCartRequest {
+  email: string;
   billingAddress: BillingAddress;
   cartRoomCategories: CartRoomCategory[];
 }
@@ -35,20 +36,12 @@ export interface CartRoomCategory {
 export interface BillingAddress {
   firstName: string;
   lastName: string;
-  companyName?: string;
-  taxId?: string;
-
   addressLine1: string;
   addressLine2?: string;
-
   cityUuid: string;
   countryUuid: string;
-
-  stateProvince?: string;
-  postalCode?: string;
-
+  postalCode: string;
   email: string;
-
-  phoneCountryUuid?: string;
-  phoneNumber?: string;
+  phoneCountryUuid: string;
+  phoneNumber: string;
 }

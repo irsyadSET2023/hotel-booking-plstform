@@ -5,7 +5,8 @@ import { sendOtpService } from "../../services/otp/customer/send-otp.customer.se
 import { verifyOtpService } from "../../services/otp/customer/verify-otp.customer.service";
 import { checkCustomerEmailService } from "../../services/customer/check-customer-email.customer.service";
 import { checkoutCartService } from "../../services/customer/checkout-cart.customer.service";
-
+import type { checkoutCartSchema } from "../../validators/customer.validator";
+import { z } from "zod";
 export const sendOtp = async (c: Context) => {
   try {
     const { email } = (
@@ -65,7 +66,9 @@ export const checkCustomerEmail = async (c: Context) => {
 
 export const checkoutCart = async (c: Context) => {
   try {
-    const payload = (c.req as any).valid("json");
+    type CheckoutCartPayload = z.infer<typeof checkoutCartSchema>;
+
+    const payload = (await c.req.json()) as CheckoutCartPayload;
 
     const result = await checkoutCartService(payload);
 

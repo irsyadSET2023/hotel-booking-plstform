@@ -18,25 +18,23 @@ export const checkoutCartSchema = z.object({
   billingDetails: z.object({
     firstName: z.string().min(1),
     lastName: z.string().min(1),
-    companyName: z.string().optional(),
-    taxId: z.string().optional(),
     addressLine1: z.string().min(1),
     addressLine2: z.string().optional(),
-    cityId: z.number(),
-    countryId: z.number(),
+    cityUuid: z.string(),
+    countryUuid: z.string(),
     postalCode: z.string(),
-    phoneCountryCodeId: z.string(),
-    phoneNumber: z.number().toString(),
+    phoneCountryCodeUuid: z.string(),
+    phoneNumber: z.string().min(7).max(15),
   }),
 
   cartItems: z.array(
     z.object({
-      roomCategoryId: z.number(),
+      roomCategoryUuid: z.string(),
       checkInDate: z.string(),
       checkOutDate: z.string(),
       specialRequests: z.string().optional(),
-      guestName: z.string().optional(),
-      guestEmail: z.string().email().optional(),
+      guestName: z.string(),
+      guestEmail: z.email(),
     }),
   ),
 

@@ -7,7 +7,6 @@ export const checkCustomerEmailService = async (email: string) => {
   });
 
   return {
-    customerUuid: customer ? customer.uuid : null,
     isVerified: customer ? customer.emailVerified : false,
   };
 };

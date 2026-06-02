@@ -47,6 +47,7 @@ enum PaymentStatus {
   REFUNDED
   FAILED
   EXPIRED
+  CANCELLED
 }
 
 enum OrderStatus {
@@ -221,7 +222,6 @@ model BillingAddress {
   uuid           String    @unique @default(uuid()) @map("uuid")
   // Parent references — only one will be non-null at a time
   customerId     BigInt?   @map("customer_id")
-  bookingId      BigInt?   @map("booking_id")
   isPrimary      Boolean   @default(false) @map("is_primary")
   firstName      String    @map("first_name")
   lastName       String    @map("last_name")
@@ -246,9 +246,9 @@ model BillingAddress {
   customer     Customer? @relation(fields: [customerId], references: [id])
   orders       Order[]
 
+  @@unique([customerId, isPrimary]) // prevent duplicate billing addresses for the same customer+booking
   @@index([uuid])
   @@index([customerId])
-  @@index([bookingId])
   @@index([cityId])
   @@index([countryId])
   @@map("billing_addresses")
@@ -453,13 +453,13 @@ model Perk {
 model Cart {
   id           BigInt    @id @default(autoincrement()) @map("id")
   uuid         String    @unique @default(uuid()) @map("uuid")
-  customerId   BigInt?   @map("customer_id")
+  customerId   BigInt    @map("customer_id")
   isCheckedOut Boolean   @default(false) @map("is_checked_out")
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
   deletedAt    DateTime? @map("deleted_at")
 
-  customer  Customer?  @relation(fields: [customerId], references: [id])
+  customer  Customer   @relation(fields: [customerId], references: [id])
   cartItems CartItem[]
   order     Order?
 
@@ -508,6 +508,7 @@ model Order {
   booking        Booking[]
   cart           Cart            @relation(fields: [cartId], references: [id])
   billingAddress BillingAddress? @relation(fields: [billingAddressId], references: [id])
+  payment        Payment?
 
   @@index([uuid])
   @@map("orders")
@@ -519,7 +520,7 @@ model Booking {
   id                 BigInt  @id @default(autoincrement()) @map("id")
   uuid               String  @unique @default(uuid()) @map("uuid")
   confirmationNumber String  @unique @default(cuid()) @map("confirmation_number")
-  orderId            BigInt  @unique @map("order_id")
+  orderId            BigInt  @map("order_id")
   hotelId            BigInt  @map("hotel_id")
   roomCategoryId     BigInt  @map("room_category_id")
   roomId             BigInt? @map("room_id")
@@ -535,11 +536,6 @@ model Booking {
   status        BookingStatus @default(PENDING) @map("status")
   source        BookingSource @default(WEBSITE) @map("source")
   externalRefId String?       @map("external_ref_id") // OTA / third-party booking reference
-
-  baseAmount     Decimal @map("base_amount") @db.Decimal(10, 2)
-  discountAmount Decimal @default(0) @map("discount_amount") @db.Decimal(10, 2)
-  taxAmount      Decimal @default(0) @map("tax_amount") @db.Decimal(10, 2)
-  totalAmount    Decimal @map("total_amount") @db.Decimal(10, 2)
 
   specialRequests    String?   @map("special_requests")
   cancellationReason String?   @map("cancellation_reason")
@@ -575,6 +571,7 @@ model Booking {
 model Payment {
   id             BigInt          @id @default(autoincrement()) @map("id")
   uuid           String          @unique @default(uuid()) @map("uuid")
+  orderId        BigInt          @unique @map("order_id")
   amount         BigInt          @map("amount") // stored in smallest currency unit (e.g. cents) to avoid floating-point issues
   currency       String          @default("USD") @map("currency")
   paymentMethod  PaymentMethod?  @map("payment_method")
@@ -587,6 +584,7 @@ model Payment {
   updatedAt      DateTime        @updatedAt @map("updated_at")
 
   paymentGatewayLogs PaymentGatewayLog[]
+  order              Order               @relation(fields: [orderId], references: [id])
 
   @@index([uuid])
   @@map("payments")
@@ -637,7 +635,7 @@ model RoomInventory {
   hotelId        BigInt @map("hotel_id")
   roomCategoryId BigInt @map("room_category_id")
 
-  inventoryDate DateTime @map("inventory_date")
+  inventoryDate DateTime @map("inventory_date") @db.Date
 
   totalRooms    Int @map("total_rooms")
   reservedRooms Int @map("reserved_rooms")
