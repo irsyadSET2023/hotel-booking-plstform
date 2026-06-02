@@ -6,6 +6,13 @@ import { PaginationComponent } from '#/components/reusable/pagination'
 import { RoomCard } from './room-card'
 import type { RoomCategory } from '../_types/room-category'
 import { Input } from '#/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '#/components/ui/select'
 
 export function RoomPage() {
   const navigate = Route.useNavigate()
@@ -85,12 +92,12 @@ export function RoomPage() {
           />
         </div>
 
-        <div className="flex flex-col gap-1 flex-1 min-w-48">
-          <label className="text-sm font-medium">Search by room category</label>
-          <SearchInput
+        <div className="flex flex-col gap-1 min-w-48">
+          <label className="text-sm font-medium">Room category</label>
+
+          <Select
             value={search.roomCategory ?? ''}
-            placeholder="Search by room type..."
-            onSearch={(value) =>
+            onValueChange={(value) =>
               navigate({
                 search: (prev) => ({
                   ...prev,
@@ -99,14 +106,28 @@ export function RoomPage() {
                 }),
               })
             }
-          />
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="All room types" />
+            </SelectTrigger>
+
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value={'Standard'}>Standard</SelectItem>
+              <SelectItem value={'Deluxe'}>Deluxe</SelectItem>
+              <SelectItem value={'Suite'}>Suite</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="border rounded-lg p-4 h-40 animate-pulse bg-gray-100" />
+            <div
+              key={i}
+              className="border rounded-lg p-4 h-40 animate-pulse bg-gray-100"
+            />
           ))}
         </div>
       ) : !data?.data?.length ? (
