@@ -33,7 +33,7 @@ export function PaginationComponent({
   onPageChange,
   onPageSizeChange,
 }: PaginationComponentProps) {
-  const pageSizeOptions = [50, 100, 200, 300, 500]
+  const pageSizeOptions = [1, 5, 10]
 
   const renderPageNumbers = () => {
     const items: JSX.Element[] = []
@@ -46,12 +46,12 @@ export function PaginationComponent({
     items.push(
       <PaginationItem key={1}>
         <PaginationLink
-          href="#"
           isActive={currentPage === 1}
           onClick={(e) => {
             e.preventDefault()
             onPageChange(1)
           }}
+          className="cursor-pointer"
         >
           1
         </PaginationLink>

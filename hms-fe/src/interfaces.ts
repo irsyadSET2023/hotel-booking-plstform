@@ -1,5 +1,5 @@
 export interface CartItem {
-  roomCategoryUuid: bigint
+  roomCategoryUuid: string
   roomCategoryName: string
   hotelName: string
   checkInDate?: Date
