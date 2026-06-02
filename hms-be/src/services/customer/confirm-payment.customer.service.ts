@@ -36,7 +36,7 @@ export const confirmPaymentService = async ({
     // 1. LOCK PAYMENT
     const paymentRows = await tx.$queryRaw<any[]>`
       SELECT *
-      FROM payment
+      FROM payments
       WHERE uuid = ${paymentUuid}
       FOR UPDATE
     `;
@@ -51,10 +51,12 @@ export const confirmPaymentService = async ({
     }
 
     // 3. LOCK ORDER + CART + ITEMS
-    const orderRows = await tx.$queryRaw<Order[]>`
-      SELECT *
-      FROM "Order"
-      WHERE id = ${payment.orderId}
+    const orderRows = await tx.$queryRaw<
+      { id: bigint; cart_id: bigint; uuid: string }[]
+    >`
+      SELECT id, cart_id, uuid
+      FROM orders
+      WHERE id = ${payment.order_id}
       FOR UPDATE
     `;
 
@@ -64,7 +66,7 @@ export const confirmPaymentService = async ({
 
     const cartItems = await tx.cartItem.findMany({
       where: {
-        cartId: order.cartId,
+        cartId: order.cart_id,
       },
       include: {
         roomCategory: {
@@ -78,7 +80,7 @@ export const confirmPaymentService = async ({
     });
 
     const cart = await tx.cart.findUnique({
-      where: { id: order.cartId },
+      where: { id: order.cart_id },
       include: { customer: true },
     });
 
@@ -101,7 +103,7 @@ export const confirmPaymentService = async ({
       tx,
       cartItems,
       customer,
-      order,
+      order as unknown as Order,
     );
     return emailBookingData;
 
